@@ -7,22 +7,60 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# Analysis of Budweiser Beer and Brewery Data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## Introduction
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+We want to analyze the distribution of manufacturing centers of Budweiser beer around the US, and additionally track features and attributes of the different beers produced. 
 
-```{r cars}
-summary(cars)
+```{r, echo=T}
+library(data.table)
+library(ggplot2)
+
+beers <- fread('~/smu_msds_6306_casestudy1/data/Beers.csv')
+breweries <- fread('~/smu_msds_6306_casestudy1/data/Breweries.csv')
+
 ```
 
-## Including Plots
+Breweries by state
 
-You can also embed plots, for example:
+```{r, echo=T}
+plot(
+  ggplot(data=breweries, aes(x=State)) +
+    geom_bar() +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle=90, hjust=1)) +
+    ggtitle("Breweries by State") 
+)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+It's clear California, Michigan, and Colorado are the most concentrated breweries. 
+
+```{r, echo=T}
+# merge
+master <- merge(beers, breweries, by.x='Brewery_id', by.y='Brew_ID')
+setnames(master, c('Name.x', 'Name.y'), c('Beer_name', 'brewery'))
+
+
+```
+
+
+Look at descriptive statistics
+
+```{r, echo=T}
+meds <- master[, list(med_alc = median(ABV, na.rm=T), med_bit = median(IBU, na.rm=T)), by='State']
+
+nas <- lapply(names(master), function(x) {
+  test <- unlist(master[, get(x)])
+  test <- test[is.na(test)]
+  return(length(test))
+})
+
+na_df <- data.table(
+  col = names(master), 
+  nas = nas
+)
+
+```
