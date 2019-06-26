@@ -1,5 +1,5 @@
 ---
-title: "beer_data_analysis"
+title: "Analysis of Budweiser Beer and Brewery Data"
 output: html_document
 ---
 
@@ -7,11 +7,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Analysis of Budweiser Beer and Brewery Data
-
 ## Introduction
 
-We want to analyze the distribution of manufacturing centers of Budweiser beer around the US, and additionally track features and attributes of the different beers produced. 
+We want to analyze the distribution of manufacturing centers of Budweiser beer around the US, and additionally track features and attributes of the different beers produced. We first set up our workspace, by loading requisite libraries and reading in the data.  
 
 ```{r, echo=T}
 library(data.table)
@@ -83,7 +81,7 @@ head(unique(master[, if(!any(!is.na(IBU))) .SD, by='brewery']$brewery), 10)
 ```
 
 
-Therefore, we will do our mean imputation by state. 
+Therefore, we will do our mean imputation by city. 
 
 ```{r, echo=T}
 master[, `:=`(ABV = replace(ABV, is.na(ABV), mean(ABV, na.rm=TRUE)),
@@ -114,7 +112,7 @@ master[Style=="", Style := "Other"]
 
 ```
 
-After imputation, we now want to see the median alochol by volume and the median bitterness of beers produced in each state. 
+After imputation, we now want to see the median alcohol by volume and the median bitterness of beers produced in each state. 
 
 
 ```{r, echo=T}
