@@ -21,14 +21,17 @@ beers <- fread('~/smu_msds_6306_casestudy1/data/Beers.csv')
 breweries <- fread('~/smu_msds_6306_casestudy1/data/Breweries.csv')
 
 ```
+## Questions of Interest
 
-Breweries by state
+The first question of interest is the number of breweries by state. Looking at the geographical distribution of our breweries can give us a sense of which regionals benefit the most from our supply chain. 
 
 ```{r, echo=T}
+breweries[, state_count := .N, by='State']
 plot(
-  ggplot(data=breweries, aes(x=State)) +
+  ggplot(data=breweries, aes(x=reorder(State, -state_count))) +
     geom_bar() +
     theme_bw() +
+    xlab("State") +
     theme(axis.text.x = element_text(angle=90, hjust=1)) +
     ggtitle("Breweries by State") 
 )
@@ -36,21 +39,22 @@ plot(
 
 ```
 
-It's clear California, Michigan, and Colorado are the most concentrated breweries. 
+It's clear California, Michigan, and Colorado have the most breweries. Some states that may benefit from additional manufacturing may be New York, Tennessee, and Nevada - judging by population and relative low number of breweries.
+
+Next, we want to see which beers are produced in which breweries.
 
 ```{r, echo=T}
 # merge
 master <- merge(beers, breweries, by.x='Brewery_id', by.y='Brew_ID')
 setnames(master, c('Name.x', 'Name.y'), c('Beer_name', 'brewery'))
 
-
+head(master[, list(Beer_name, brewery, State)], 6)
 ```
 
+One possible weak point in our analysis is the number of missing values. Below, we show the number of missing values in each column. 
 
-Look at descriptive statistics
 
 ```{r, echo=T}
-meds <- master[, list(med_alc = median(ABV, na.rm=T), med_bit = median(IBU, na.rm=T)), by='State']
 
 nas <- lapply(names(master), function(x) {
   test <- unlist(master[, get(x)])
@@ -62,5 +66,113 @@ na_df <- data.table(
   col = names(master), 
   nas = nas
 )
+na_df
+```
+
+We see that information is complete on all columns besides the alcohol by volume and the bitterness of each beer. A logical assumption to a missing ABV entry may be to assume that beer is non-alcoholic; if that's the case, then we can simply impute 0 for the missing values. However, spot checks on those missing values did not reveal those beers to be non-alcoholic. We will then proceed to perform some mean imputation. 
+
+Ideally we could do this by brewery, on both ABV and IBU. However, it appears that many breweries fail to report this data at all. 
+
+
+```{r, echo=T}
+# Missing alcohol by volume reporting
+head(unique(master[, if(!any(!is.na(ABV))) .SD, by='brewery']$brewery), 10)
+
+# Missing bitterness reporting
+head(unique(master[, if(!any(!is.na(IBU))) .SD, by='brewery']$brewery), 10)
+```
+
+
+Therefore, we will do our mean imputation by state. 
+
+```{r, echo=T}
+master[, `:=`(ABV = replace(ABV, is.na(ABV), mean(ABV, na.rm=TRUE)),
+              IBU = replace(IBU, is.na(IBU), as.integer(round(mean(IBU, na.rm=TRUE))))), 
+       by='State']
 
 ```
+
+We still see that no breweries in South Dakota report any bitterness measurements, but there are only 7 beers produced in South Dakota, a small number relative to the size of our dataset. We will carry on ignoring those 7 missing values. 
+```{r, echo=T}
+nas <- lapply(names(master), function(x) {
+  test <- unlist(master[, get(x)])
+  test <- test[is.na(test)]
+  return(length(test))
+})
+
+na_df <- data.table(
+  col = names(master), 
+  nas = nas
+)
+na_df
+```
+
+Additionally, we discovered 5 beers without a style listed. For the purposes of this analysis we will group these beers with the "Other" grouping. 
+
+```{r, echo=T} 
+master[Style=="", Style := "Other"]
+
+```
+
+After imputation, we now want to see the median alochol by volume and the median bitterness of beers produced in each state. 
+
+
+```{r, echo=T}
+meds <- master[, list(med_alc = median(ABV, na.rm=T), med_bit = median(IBU, na.rm=T)), by='State']
+
+# ABV by state
+plot(
+  ggplot(data=meds, aes(x=reorder(State, -med_alc), y=med_alc)) +
+    theme_bw() +
+    ggtitle("Median ABV by State") +
+    geom_bar(stat='identity', position='dodge') +
+    xlab("State") +
+    ylab("Median ABV") +
+    theme(axis.text.x = element_text(angle=90, hjust=1))
+)
+
+# IBU by state
+plot(
+  ggplot(data=meds, aes(x=reorder(State, -med_bit), y=med_bit)) +
+    theme_bw() +
+    ggtitle("Median IBU by State") +
+    geom_bar(stat='identity', position='dodge') +
+    xlab("State") +
+    ylab("Median IBU") +
+    theme(axis.text.x = element_text(angle=90, hjust=1))
+)
+
+```
+
+From this, we see that Kentucky, Colorado, and Michigan produce the most alcoholic beers on average, while West Virginia, New Mexico, and Washington DC produce the bitterest beers on average. 
+
+Summary statistics are always helpful for quick analysis. Across the US, we have a summary for ABV:
+
+```{r, echo=T}
+
+summary(master$ABV)
+```
+We see a mean ABV of about 5.98%, and a median of 5.7%, suggesting most beers are less alcoholic than the mean - the ABV 10%+ beers may be skewing the average. 
+
+
+Another question of interest may be whether high-alcohol beers tend to be more bitter. We will look at a scatterplot to see if anything is revealed. 
+
+```{r, echo=T}
+
+plot(
+  ggplot(data=master, aes(x=ABV, y=IBU)) +
+    theme_bw()+
+    geom_point() +
+    ggtitle("IBU vs. ABV")
+)
+
+```
+
+We do see the beginnings of what may be a linear relationship there. On average, it looks like highly alcoholic beers are correlated with a higher IBU rating. Formally testing this via simple linear regression may not be robust, however; the data also shows increasing variance in IBU for higher-alcohol beers. Attempts to quantify this relationship will be put off for further analysis, if necessary. 
+
+## Conclusion
+
+In conclusion, the topics tackled in this document are brewery distribution by state, missing value handling, alcohol and bitterness content by state, and correlation between alcohol and bitterness content. We answered most of these questions using insightful graphical tools.
+
+As for recommendations on paths forward, I leave that up to the bright minds in your company - but I hope the data presented to you and the analysis given will prove useful in guiding you forward. Thank you for listening to my presentation, and best of luck moving forward. 
+
