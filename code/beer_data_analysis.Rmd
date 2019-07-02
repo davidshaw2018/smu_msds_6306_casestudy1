@@ -62,7 +62,8 @@ nas <- lapply(names(master), function(x) {
 
 na_df <- data.table(
   col = names(master), 
-  nas = nas
+  nas = nas,
+  pct_nas = lapply(nas, function(x) x/nrow(master))
 )
 na_df
 ```
@@ -166,7 +167,15 @@ plot(
 
 ```
 
-We do see the beginnings of what may be a linear relationship there. On average, it looks like highly alcoholic beers are correlated with a higher IBU rating. Formally testing this via simple linear regression may not be robust, however; the data also shows increasing variance in IBU for higher-alcohol beers. Attempts to quantify this relationship will be put off for further analysis, if necessary. 
+We do see the beginnings of what may be a linear relationship there. On average, it looks like highly alcoholic beers are correlated with a higher IBU rating. We will test this with a simple linear regression.
+
+```{r, echo=T}
+lin_reg <- lm(formula = IBU~ABV, data=master)
+summary(lin_reg)
+
+```
+
+We see strong evidence at a significance level of .01 that IBU is correlated with ABV. However, the data shows increasing variance in IBU for higher-alcohol beers; a simple linear regression like what we performed in this case is likely biased. If desired, a more robust statistical technique can be used to test this relationship such as a log-transformed linear regression, but the visual evidence is likely satisfactory for this presentation. 
 
 ## Conclusion
 
